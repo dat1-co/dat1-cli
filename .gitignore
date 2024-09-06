@@ -1,0 +1,11 @@
+.idea/
+*.iml
+.dat1
+.dockerignore
+.DS_Store
+__pycache__/
+*.egg-info/
+.installed.cfg
+*.egg
+*.pyc
+build/
