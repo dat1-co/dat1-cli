@@ -18,7 +18,7 @@ def usr_api_key_validate(usr_api_key):
 
     # Check if the request was successful
     if response.status_code == 200:
-        print('\nAuthentication successful.')
+        print('\nAuthentication successful')
         return True
     else:
         print(f'\nAuthentication failed. Status code: {response.status_code}')
@@ -55,22 +55,22 @@ def login() -> None:
 
 @app.command()
 def init() -> None:
-    """Initialize the project"""
-    print("""Initialize the project""")
+    """Initialize the model"""
+    print("""Initialize the model""")
     questions = [
-        inquirer.Text('project_name', message="Enter project name")
+        inquirer.Text('model_name', message="Enter model name")
     ]
     answers = inquirer.prompt(questions)
     if Path("config.yaml").is_file():
         with open('config.yaml', 'r') as f:
             config = yaml.safe_load(f)
-        config["project_name"] = answers["project_name"]
+        config["model_name"] = answers["model_name"]
         with open('config.yaml', 'w') as f:
             yaml.dump(config, f)
         print('Config file edited')
     else:
         print('Config file created')
-        config = {"project_name":answers["project_name"]}
+        config = {"model_name":answers["model_name"]}
         with open('config.yaml', 'w') as f:
             yaml.dump(config, f)
     print(config)
@@ -78,8 +78,40 @@ def init() -> None:
 
 @app.command()
 def deploy() -> None:
-    """Deploy the project"""
-    print("""Deploy the project""")
+    """Deploy the model"""
+    print("""Deploy the model""")
+    "1. Read config"
+    if Path("config.yaml").is_file():
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+
+        url = f"https://dev-api.dat1.co/api/v1/models/{config['model_name']}"
+        headers = {"X-API-Key": config["user_api_key"]}
+        
+        "2. Get model by name"
+        try:
+            model = requests.request("GET", url, data="", headers=headers).text
+        except Exception:
+            print(Exception)
+
+        if model:
+            print(model)
+        else:
+            "3. Create new model"
+            try:
+                model = requests.request("POST", url, data="", headers=headers).text
+            except Exception:
+                print(Exception)
+        
+        "4. Get model versions"
+        try:
+            versions = requests.request("GET", url + "/versions", data="", headers=headers).text
+        except Exception:
+            print(Exception)
+        print(versions)
+    else:
+        print("You must init model first")
+
 
 
 @app.command()
