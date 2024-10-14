@@ -2,6 +2,8 @@ import typer
 import inquirer
 import requests
 import yaml
+import hashlib
+# from tqdm.cli import tqdm
 from pathlib import Path
 from typing import Optional
 
@@ -23,6 +25,21 @@ def usr_api_key_validate(usr_api_key):
     else:
         print(f'\nAuthentication failed. Status code: {response.status_code}')
         return False
+    
+
+def calculate_hashes(directory, exclude_file_names=None):
+    """ Calculate hashes of files in a given directory, excluding files specified in the exclude list."""
+    hashes = []
+    exclude_set = set(exclude_file_names) if exclude_file_names else []
+    
+    for file_path in Path(directory).iterdir():
+        if file_path.is_file() and file_path.name not in exclude_set:
+            hasher = hashlib.sha512()
+            with file_path.open('rb') as f:
+                while chunk := f.read(8192):
+                    hasher.update(chunk)
+            hashes.append({"path": str(file_path.relative_to(directory)), "hash":hasher.hexdigest()})
+    return hashes
 
 
 @app.command()
@@ -70,7 +87,7 @@ def init() -> None:
         print('Config file edited')
     else:
         print('Config file created')
-        config = {"model_name":answers["model_name"]}
+        config = {"model_name":answers["model_name"], "exclude":[]}
         with open('config.yaml', 'w') as f:
             yaml.dump(config, f)
     print(config)
@@ -81,6 +98,8 @@ def deploy() -> None:
     """Deploy the model"""
     print("""Deploy the model""")
     "1. Read config"
+    # print(calculate_hashes("./"))
+    # return
     if Path("config.yaml").is_file():
         with open('config.yaml', 'r') as f:
             config = yaml.safe_load(f)
@@ -108,7 +127,63 @@ def deploy() -> None:
             versions = requests.request("GET", url + "/versions", data="", headers=headers).text
         except Exception:
             print(Exception)
-        print(versions)
+        # print(versions)
+        "5. Calculate hashes for working version of the model"
+        files_hashes = calculate_hashes("./", exclude_file_names=config["exclude"])
+        if versions:
+            "6. Find modified and new files"
+            latest_version_set = set((x["path"], x["hash"]) for x in versions[-1]["files"])
+            current_version_set = set((x["path"], x["hash"]) for x in files_hashes)
+            files_to_keep = [x for x in versions[-1]["files"] if (x["path"], x["hash"]) in current_version_set]
+            files_to_add = [x for x in files_hashes if (x["path"], x["hash"]) not in latest_version_set]
+        else:
+            files_to_keep = []
+            files_to_add = files_hashes
+            
+        "7. Create new version of the model with reusing files"
+        url = f"https://dev-api.dat1.co/api/v1/models/{config["model_name"]}/versions"
+        payload = {"files": files_to_keep}
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": config["user_api_key"]
+        }
+        try:
+            new_model_version = requests.request("POST", url, json=payload, headers=headers).text["version"]
+        except Exception:
+            print(Exception)
+        
+        "8. Add files to the new version of the model"
+        for f in files_to_add:
+            url = f"https://dev-api.dat1.co/api/v1/models/{config["model_name"]}/versions/{new_model_version}/files"
+
+            headers = {
+                "Content-Type": "application/json",
+                "X-API-Key": "wehtpo2u38tlijgiwlrjg"
+            }
+
+            try:
+                upload_url = requests.request("POST", url, json=f, headers=headers).text["uploadUrl"]
+            except Exception:
+                print(Exception)
+            with open(f["path"], 'rb') as bf:
+                files = {'file': (f["path"], bf)}
+                http_response = requests.post(upload_url, data=result['fields'], files=files).text # FIX
+        
+        "9. Mark version as complete"
+        url = f"https://dev-api.dat1.co/api/v1/models/{config["model_name"]}/versions/{new_model_version}/complete"
+
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": config["user_api_key"]
+        }
+
+        try:
+            response = requests.request("POST", url, headers=headers).text
+        except Exception:
+                print(Exception)
+
+
+
     else:
         print("You must init model first")
 

@@ -1,2 +1,5 @@
 model_name: dev-test-model-v4
 user_api_key: wehtpo2u38tlijgiwlrjg
+exclude: [
+  ".gitignore",
+]
