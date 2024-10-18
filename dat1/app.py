@@ -212,7 +212,9 @@ def deploy() -> None:
             exit(1)
 
         "5. Calculate hashes for working version of the model"
-        files_hashes = calculate_hashes("./", exclude_file_names=config.get("exclude") or [])
+        exclude = config.get("exclude") or []
+        exclude.append(PROJECT_CONFIG_NAME)
+        files_hashes = calculate_hashes("./", exclude_file_names=exclude)
         if completed_versions:
             "6. Find modified and new files"
             latest_version_set = set((x["path"], x["hash"]) for x in completed_versions[-1]["files"])
