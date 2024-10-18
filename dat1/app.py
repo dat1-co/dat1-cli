@@ -163,7 +163,7 @@ def upload_file(file, api_key, model_name, new_model_version):
 
 @app.command()
 def deploy() -> None:
-    with yaspin(text="Preparing", color="white") as sp:
+    with yaspin(text="preparing", color="white") as sp:
         """Deploy the model"""
         "1. Read config"
         if not Path(PROJECT_CONFIG_NAME).is_file():
