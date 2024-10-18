@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import typer
 import inquirer
 import requests
@@ -12,7 +14,7 @@ from dat1 import __app_name__, __version__
 
 app = typer.Typer()
 CFG_PTH = Path("~/.dat1/dat1-cfg.yaml").expanduser()
-UPLOAD_CHUNK_SIZE = 500_000_000
+UPLOAD_CHUNK_SIZE = 250_000_000
 
 
 def usr_api_key_validate(usr_api_key):
@@ -88,6 +90,73 @@ def init() -> None:
         with open('config.yaml', 'w') as f:
             yaml.dump(config, f)
     print(config)
+
+
+def read_file(file_path, part_number):
+    start_byte = part_number * UPLOAD_CHUNK_SIZE
+
+    with open(file_path, 'rb') as file:
+        file.seek(start_byte)  # Move to the start of the part
+        return file.read(UPLOAD_CHUNK_SIZE)
+
+
+def upload_file_part(upload_url, file_path, part_number):
+    response = requests.put(upload_url, data=read_file(file_path, part_number))
+    if response.status_code != 200:
+        print(f"Failed to upload file: {response.text}")
+        exit(1)
+    return {"part_number": part_number + 1, "etag": response.headers["ETag"]}
+
+
+def upload_file(file, api_key, model_name, new_model_version):
+    print(f"Uploading new file: {file['path']}")
+    file_size = Path(file["path"]).stat().st_size
+    parts = file_size // UPLOAD_CHUNK_SIZE + 1
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-API-Key": api_key
+    }
+
+    try:
+        create_upload_response = requests.request(
+            "POST",
+            f"https://api.dat1.co/api/v1/models/{model_name}/versions/{new_model_version}/files?parts={parts}",
+            json=file, headers=headers
+        ).json()
+        upload_urls = create_upload_response["uploadUrls"]
+        upload_id = create_upload_response["uploadId"]
+        s3_key = create_upload_response["s3Key"]
+    except Exception as e:
+        print(e)
+        traceback.print_exc()
+        exit(1)
+
+    tasks = enumerate(upload_urls)
+    file_size = Path(file["path"]).stat().st_size
+
+    def process_part(x):
+        return upload_file_part(x[1], file['path'], x[0])
+
+    if len(upload_urls) > 4:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            parts_data = list(pool.map(process_part, tasks))
+    else:
+        parts_data = list(map(process_part, tasks))
+
+    parts_data.sort(key=lambda x: x["part_number"])
+
+
+    res = requests.request(
+        "POST",
+        f"https://api.dat1.co/api/v1/models/uploads/{upload_id}/complete",
+        json={"parts": parts_data, "s3_key": s3_key},
+        headers=headers
+    )
+
+    if res.status_code != 200:
+        print(f"Failed to complete upload: {res.text}")
+        exit(1)
 
 
 @app.command()
@@ -167,50 +236,8 @@ def deploy() -> None:
         exit(1)
 
     "8. Add files to the new version of the model"
-    for file in files_to_add:
-        print(f"Uploading new file: {file['path']}")
-        file_size = Path(file["path"]).stat().st_size
-        parts = file_size // UPLOAD_CHUNK_SIZE + 1
-
-        headers = {
-            "Content-Type": "application/json",
-            "X-API-Key": api_key
-        }
-
-        try:
-            create_upload_response = requests.request(
-                "POST",
-                f"https://api.dat1.co/api/v1/models/{config['model_name']}/versions/{new_model_version}/files?parts={parts}",
-                json=file, headers=headers
-            ).json()
-            upload_urls = create_upload_response["uploadUrls"]
-            upload_id = create_upload_response["uploadId"]
-            s3_key = create_upload_response["s3Key"]
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
-            exit(1)
-
-        parts_data = []
-        with open(file["path"], 'rb') as binary_file:
-            for i, signed_url in enumerate(upload_urls):
-                data_chunk = binary_file.read(UPLOAD_CHUNK_SIZE)
-                response = requests.put(signed_url, data=data_chunk)
-                if response.status_code != 200:
-                    print(f"Failed to upload file: {response.text}")
-                    exit(1)
-                parts_data.append({"part_number": i + 1, "etag": response.headers["ETag"]})
-
-        res = requests.request(
-            "POST",
-            f"https://api.dat1.co/api/v1/models/uploads/{upload_id}/complete",
-            json={"parts": parts_data, "s3_key": s3_key},
-            headers=headers
-        )
-        if res.status_code != 200:
-            print(f"Failed to complete upload: {res.text}")
-            exit(1)
-
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        executor.map(lambda x: upload_file(x, api_key, config["model_name"], new_model_version), files_to_add)
 
     "9. Mark version as complete"
     url = f"https://api.dat1.co/api/v1/models/{config['model_name']}/versions/{new_model_version}/complete"
