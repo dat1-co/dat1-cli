@@ -6,6 +6,7 @@ import requests
 import yaml
 import hashlib
 import traceback
+from yaspin import yaspin
 # from tqdm.cli import tqdm
 from pathlib import Path
 from typing import Optional
@@ -14,6 +15,7 @@ from dat1 import __app_name__, __version__
 
 app = typer.Typer()
 CFG_PTH = Path("~/.dat1/dat1-cfg.yaml").expanduser()
+PROJECT_CONFIG_NAME = "dat1.yaml"
 UPLOAD_CHUNK_SIZE = 250_000_000
 
 
@@ -77,17 +79,17 @@ def init() -> None:
         inquirer.Text('model_name', message="Enter model name")
     ]
     answers = inquirer.prompt(questions)
-    if Path("config.yaml").is_file():
-        with open('config.yaml', 'r') as f:
+    if Path(PROJECT_CONFIG_NAME).is_file():
+        with open(PROJECT_CONFIG_NAME, 'r') as f:
             config = yaml.safe_load(f)
         config["model_name"] = answers["model_name"]
-        with open('config.yaml', 'w') as f:
+        with open(PROJECT_CONFIG_NAME, 'w') as f:
             yaml.dump(config, f)
         print('Config file edited')
     else:
         print('Config file created')
         config = {"model_name": answers["model_name"], "exclude": []}
-        with open('config.yaml', 'w') as f:
+        with open(PROJECT_CONFIG_NAME, 'w') as f:
             yaml.dump(config, f)
     print(config)
 
@@ -161,79 +163,81 @@ def upload_file(file, api_key, model_name, new_model_version):
 
 @app.command()
 def deploy() -> None:
-    """Deploy the model"""
-    "1. Read config"
-    if not Path("config.yaml").is_file():
-        print("Config not found, run 'dat1 init' first")
-        exit(1)
+    with yaspin(text="Preparing", color="white") as sp:
+        """Deploy the model"""
+        "1. Read config"
+        if not Path(PROJECT_CONFIG_NAME).is_file():
+            print("Config not found, run 'dat1 init' first")
+            exit(1)
 
-    with open(CFG_PTH, 'r') as global_cfg:
-        api_key = yaml.safe_load(global_cfg)["user_api_key"]
-    with open('config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
+        with open(CFG_PTH, 'r') as global_cfg:
+            api_key = yaml.safe_load(global_cfg)["user_api_key"]
+        with open(PROJECT_CONFIG_NAME, 'r') as file:
+            config = yaml.safe_load(file)
 
-    url = f"https://api.dat1.co/api/v1/models/{config['model_name']}"
-    headers = {"X-API-Key": api_key}
+        url = f"https://api.dat1.co/api/v1/models/{config['model_name']}"
+        headers = {"X-API-Key": api_key}
 
-    "2. Get model by name"
-    try:
-        response = requests.request("GET", url, headers=headers)
-    except Exception as e:
-        print(e)
-        traceback.print_exc()
-        exit(1)
-
-    if response.status_code != 200 and response.status_code != 404:
-        print(f"Failed to get model: {response.text}")
-        exit(1)
-
-    if response.status_code == 404:
-        "3. Create new model"
+        "2. Get model by name"
         try:
-            response = requests.request("POST", url, headers=headers)
-            if response.status_code != 200:
-                print(f"Failed to create model: {response.text}")
-                exit(1)
+            response = requests.request("GET", url, headers=headers)
         except Exception as e:
             print(e)
             traceback.print_exc()
             exit(1)
 
-    "4. Get model versions"
-    try:
-        versions = requests.request("GET", url + "/versions", headers=headers).json()
-        completed_versions = [x for x in versions if x["isCompleted"]]
-    except Exception as e:
-        print(e)
-        traceback.print_exc()
-        exit(1)
+        if response.status_code != 200 and response.status_code != 404:
+            print(f"Failed to get model: {response.text}")
+            exit(1)
 
-    "5. Calculate hashes for working version of the model"
-    files_hashes = calculate_hashes("./", exclude_file_names=config.get("exclude") or [])
-    if completed_versions:
-        "6. Find modified and new files"
-        latest_version_set = set((x["path"], x["hash"]) for x in completed_versions[-1]["files"])
-        current_version_set = set((x["path"], x["hash"]) for x in files_hashes)
-        files_to_keep = [x for x in completed_versions[-1]["files"] if (x["path"], x["hash"]) in current_version_set]
-        files_to_add = [x for x in files_hashes if (x["path"], x["hash"]) not in latest_version_set]
-    else:
-        files_to_keep = []
-        files_to_add = files_hashes
+        if response.status_code == 404:
+            "3. Create new model"
+            try:
+                response = requests.request("POST", url, headers=headers)
+                if response.status_code != 200:
+                    print(f"Failed to create model: {response.text}")
+                    exit(1)
+            except Exception as e:
+                print(e)
+                traceback.print_exc()
+                exit(1)
 
-    "7. Create new version of the model with reusing files"
-    url = f"https://api.dat1.co/api/v1/models/{config['model_name']}/versions"
-    payload = {"files": files_to_keep}
-    headers = {
-        "Content-Type": "application/json",
-        "X-API-Key": api_key
-    }
-    try:
-        response = requests.request("POST", url, json=payload, headers=headers).json()
-        new_model_version = response["version"]
-    except Exception as e:
-        print(e)
-        traceback.print_exc()
-        exit(1)
+        "4. Get model versions"
+        try:
+            versions = requests.request("GET", url + "/versions", headers=headers).json()
+            completed_versions = [x for x in versions if x["isCompleted"]]
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            exit(1)
+
+        "5. Calculate hashes for working version of the model"
+        files_hashes = calculate_hashes("./", exclude_file_names=config.get("exclude") or [])
+        if completed_versions:
+            "6. Find modified and new files"
+            latest_version_set = set((x["path"], x["hash"]) for x in completed_versions[-1]["files"])
+            current_version_set = set((x["path"], x["hash"]) for x in files_hashes)
+            files_to_keep = [x for x in completed_versions[-1]["files"] if (x["path"], x["hash"]) in current_version_set]
+            files_to_add = [x for x in files_hashes if (x["path"], x["hash"]) not in latest_version_set]
+        else:
+            files_to_keep = []
+            files_to_add = files_hashes
+
+        "7. Create new version of the model with reusing files"
+        url = f"https://api.dat1.co/api/v1/models/{config['model_name']}/versions"
+        payload = {"files": files_to_keep}
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": api_key
+        }
+        try:
+            response = requests.request("POST", url, json=payload, headers=headers).json()
+            new_model_version = response["version"]
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            exit(1)
+        sp.ok("✅ ")
 
     "8. Add files to the new version of the model"
     with ThreadPoolExecutor(max_workers=4) as executor:
