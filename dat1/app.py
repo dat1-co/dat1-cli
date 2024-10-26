@@ -19,9 +19,11 @@ PROJECT_CONFIG_NAME = "dat1.yaml"
 UPLOAD_CHUNK_SIZE = 250_000_000
 
 
+root_url = "https://api.dat1.co/api/v1"
+
 def usr_api_key_validate(usr_api_key):
     # Make the POST request
-    response = requests.post('https://api.dat1.co/api/v1/auth', headers={'X-API-Key': usr_api_key})
+    response = requests.post(f'${root_url}/auth', headers={'X-API-Key': usr_api_key})
 
     # Check if the request was successful
     if response.status_code == 200:
@@ -123,41 +125,22 @@ def upload_file(file, api_key, model_name, new_model_version):
     try:
         create_upload_response = requests.request(
             "POST",
-            f"https://api.dat1.co/api/v1/models/{model_name}/versions/{new_model_version}/files?parts={parts}",
+            f"{root_url}/models/{model_name}/versions/{new_model_version}/files?parts={parts}",
             json=file, headers=headers
         ).json()
-        upload_urls = create_upload_response["uploadUrls"]
-        upload_id = create_upload_response["uploadId"]
-        s3_key = create_upload_response["s3Key"]
+        upload_url = create_upload_response["uploadUrl"]
+
+        with open(file['path'], "rb") as file_data:
+            response = requests.put(upload_url, data=file_data, headers={
+                "Content-Type": "application/octet-stream"
+            })
+            if response.status_code != 200:
+                print(f"Failed to upload file: {response.text}")
+                exit(1)
+
     except Exception as e:
         print(e)
         traceback.print_exc()
-        exit(1)
-
-    tasks = enumerate(upload_urls)
-    file_size = Path(file["path"]).stat().st_size
-
-    def process_part(x):
-        return upload_file_part(x[1], file['path'], x[0])
-
-    if len(upload_urls) > 4:
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            parts_data = list(pool.map(process_part, tasks))
-    else:
-        parts_data = list(map(process_part, tasks))
-
-    parts_data.sort(key=lambda x: x["part_number"])
-
-
-    res = requests.request(
-        "POST",
-        f"https://api.dat1.co/api/v1/models/uploads/{upload_id}/complete",
-        json={"parts": parts_data, "s3_key": s3_key},
-        headers=headers
-    )
-
-    if res.status_code != 200:
-        print(f"Failed to complete upload: {res.text}")
         exit(1)
 
 
@@ -175,7 +158,7 @@ def deploy() -> None:
         with open(PROJECT_CONFIG_NAME, 'r') as file:
             config = yaml.safe_load(file)
 
-        url = f"https://api.dat1.co/api/v1/models/{config['model_name']}"
+        url = f"{root_url}/models/{config['model_name']}"
         headers = {"X-API-Key": api_key}
 
         "2. Get model by name"
@@ -226,7 +209,7 @@ def deploy() -> None:
             files_to_add = files_hashes
 
         "7. Create new version of the model with reusing files"
-        url = f"https://api.dat1.co/api/v1/models/{config['model_name']}/versions"
+        url = f"{root_url}/models/{config['model_name']}/versions"
         payload = {"files": files_to_keep}
         headers = {
             "Content-Type": "application/json",
@@ -243,10 +226,20 @@ def deploy() -> None:
 
     "8. Add files to the new version of the model"
     with ThreadPoolExecutor(max_workers=4) as executor:
-        executor.map(lambda x: upload_file(x, api_key, config["model_name"], new_model_version), files_to_add)
+        results = executor.map(
+            lambda x: upload_file(x, api_key, config["model_name"], new_model_version),
+            files_to_add
+        )
+        try:
+            for x, return_value in results:
+                print(f"Uploaded file: {x['path']}")
+        except Exception as e:
+            print("Failed to upload file")
+            traceback.print_exc()
+            exit(1)
 
     "9. Mark version as complete"
-    url = f"https://api.dat1.co/api/v1/models/{config['model_name']}/versions/{new_model_version}/complete"
+    url = f"{root_url}/models/{config['model_name']}/versions/{new_model_version}/complete"
 
     headers = {
         "Content-Type": "application/json",
