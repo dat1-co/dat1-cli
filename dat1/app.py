@@ -137,6 +137,7 @@ def upload_file(file, api_key, model_name, new_model_version):
             if response.status_code != 200:
                 print(f"Failed to upload file: {response.text}")
                 exit(1)
+            return file
 
     except Exception as e:
         print(e)
@@ -231,7 +232,7 @@ def deploy() -> None:
             files_to_add
         )
         try:
-            for x, return_value in results:
+            for x in results:
                 print(f"Uploaded file: {x['path']}")
         except Exception as e:
             print("Failed to upload file")
