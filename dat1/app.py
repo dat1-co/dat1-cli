@@ -23,7 +23,7 @@ root_url = "https://api.dat1.co/api/v1"
 
 def usr_api_key_validate(usr_api_key):
     # Make the POST request
-    response = requests.post(f'${root_url}/auth', headers={'X-API-Key': usr_api_key})
+    response = requests.post(f'{root_url}/auth', headers={'X-API-Key': usr_api_key})
 
     # Check if the request was successful
     if response.status_code == 200:
@@ -256,16 +256,16 @@ def deploy() -> None:
         exit(1)
 
 
-@app.command()
-def serve() -> None:
-    """Serve the project locally"""
-    print("""Serve the project locally""")
-
-
-@app.command()
-def destroy() -> None:
-    """Destroy the project"""
-    print("""Destroy the project""")
+# @app.command()
+# def serve() -> None:
+#     """Serve the project locally"""
+#     print("""Serve the project locally""")
+#
+#
+# @app.command()
+# def destroy() -> None:
+#     """Destroy the project"""
+#     print("""Destroy the project""")
 
 
 def _version_callback(value: bool) -> None:
