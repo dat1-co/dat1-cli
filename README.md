@@ -56,6 +56,20 @@ async def infer(request: Request):
     return { "response" : outputs[0].outputs[0].text }
 ```
 
+## Launching Locally
+
+### Pre-requisites
+
+- Docker
+- CUDA-compatible GPU 
+- NVIDIA Container Toolkit
+
+To launch your model locally, run:
+
+```bash
+dat1 serve
+```
+
 ## License
 
 MIT

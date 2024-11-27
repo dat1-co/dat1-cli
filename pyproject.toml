@@ -1,6 +1,6 @@
 [project]
 name = "dat1-cli"
-version = "0.0.4"
+version = "0.0.5"
 license = { text = "MIT" }
 
 dependencies = [
@@ -9,6 +9,7 @@ dependencies = [
     "boto3 >= 1.35.43",
     "pyyaml >= 6.0.2",
     "yaspin >= 3.1.0",
+    "docker >= 7.1.0"
 ]
 
 [project.readme]

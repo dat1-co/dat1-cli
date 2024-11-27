@@ -257,17 +257,87 @@ def deploy() -> None:
         exit(1)
 
 
-# @app.command()
-# def serve() -> None:
-#     """Serve the project locally"""
-#     print("""Serve the project locally""")
-#
-#
-# @app.command()
-# def destroy() -> None:
-#     """Destroy the project"""
-#     print("""Destroy the project""")
+@app.command()
+def serve() -> None:
+    """Serve the project locally"""
+    import docker
+    import sys
+    import signal
+    import threading
+    import os
 
+    client = docker.from_env()
+
+    image_name = "public.ecr.aws/dat1/dat1/runtime:0.1"
+    container = None  # Global reference for cleanup
+    stop_requested = threading.Event()  # Event to signal stop
+
+    def stop_container(signum, frame):
+        """Signal handler to stop the container gracefully."""
+        print("\nSignal received. Stopping container...")
+        stop_requested.set()  # Notify threads to stop
+        if container:
+            container.kill()
+            print("\n✅  container stopped.")
+        sys.exit(0)
+
+    def stream_logs(container):
+        """Function to stream container logs in a separate thread."""
+        try:
+            for log in container.logs(stream=True):
+                if stop_requested.is_set():
+                    break  # Stop streaming if requested
+                print(log.decode('utf-8'), end="")
+        except Exception as e:
+            if not stop_requested.is_set():  # Ignore errors if stopping
+                print(f"\nError streaming logs: {e}")
+
+    # Attach the signal handler for SIGINT (Ctrl+C)
+    signal.signal(signal.SIGINT, stop_container)
+
+    try:
+        # Pull the image
+        print(f"Pulling image: {image_name}")
+        for line in client.api.pull(image_name, stream=True, decode=True):
+            if 'id' in line:
+                layer_id = line['id']
+                status = line.get('status', '')
+                progress = line.get('progress', '')
+
+                sys.stdout.write(f"\rLayer {layer_id}: {status} {progress}")
+                sys.stdout.flush()
+
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print("\n✅  image pulled successfully")
+
+        # Start the container
+        print("\n✅  starting container...")
+        devices = [docker.types.DeviceRequest(device_ids=[str(gpu_id)], capabilities=[['gpu']]) for gpu_id in [0,]]
+        path = str(Path.cwd())
+        container = client.containers.run(
+            image_name,
+            auto_remove=True,
+            device_requests=devices,
+            volumes=[path + ":/app"],
+            ports={8000: 8000},
+            detach=True,  # Detach so we can monitor it separately
+        )
+        print(f"\n✅  container started with ID: {container.id}\nstreaming logs...\n")
+
+        # Start the log streaming in a background thread
+        log_thread = threading.Thread(target=lambda: stream_logs(container))
+        log_thread.start()
+
+        # Wait for stop signal
+        while not stop_requested.is_set():
+            log_thread.join(timeout=0.1)  # Allow periodic checking for stop signal
+
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        if container and container.status == "running":
+            container.kill()
+            print("\n✅  container stopped.")
 
 def _version_callback(value: bool) -> None:
     if value:
