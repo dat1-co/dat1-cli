@@ -268,7 +268,7 @@ def serve() -> None:
 
     client = docker.from_env()
 
-    image_name = "public.ecr.aws/dat1/dat1/runtime:0.1"
+    image_name = "public.ecr.aws/dat1/dat1/runtime:0.2"
     container = None  # Global reference for cleanup
     stop_requested = threading.Event()  # Event to signal stop
 
@@ -298,15 +298,25 @@ def serve() -> None:
     try:
         # Pull the image
         print(f"Pulling image: {image_name}")
+        layer_progress = {}
         for line in client.api.pull(image_name, stream=True, decode=True):
-            if 'id' in line:
+            if 'id' in line:  # Each layer has an 'id'
                 layer_id = line['id']
                 status = line.get('status', '')
                 progress = line.get('progress', '')
 
-                sys.stdout.write(f"\rLayer {layer_id}: {status} {progress}")
-                sys.stdout.flush()
+                # Update the progress for the layer
+                layer_progress[layer_id] = f"{status} {progress}"
 
+                # Clear the screen and redraw the progress table
+                sys.stdout.write("\033[H\033[J")  # Clear terminal (Linux/macOS; adjust for Windows)
+                print(f"Pulling image: {image_name}\n")
+                for layer_id, progress in layer_progress.items():
+                    print(f"Layer {layer_id}: {progress}")
+                sys.stdout.flush()
+            else:
+                # Handle general status messages (not layer-specific)
+                print(line.get('status', ''))
         os.system('cls' if os.name == 'nt' else 'clear')
         print("\n✅  image pulled successfully")
 
