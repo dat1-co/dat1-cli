@@ -256,6 +256,8 @@ def deploy() -> None:
         print(e)
         exit(1)
 
+    print(f"✅  model deployed successfully, available at: \n\n    POST https://api.dat1.co/api/v1/inference/{config['model_name']}/invoke\n")
+
 
 @app.command()
 def serve() -> None:
