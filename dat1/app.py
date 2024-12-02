@@ -257,6 +257,14 @@ def deploy() -> None:
         exit(1)
 
     print(f"✅  model deployed successfully, available at: \n\n    POST https://api.dat1.co/api/v1/inference/{config['model_name']}/invoke\n")
+    print(f"Invoke with cURL:")
+    print(f"curl --request POST \n\
+  --url https://api.dat1.co/api/v1/inference/{config['model_name']}/invoke \n\
+  --header 'Content-Type: application/json' \n\
+  --header 'X-API-Key: <your api key>' \n\
+  --data '{{\n\
+    \"input\": <your model input>\n\
+}}'\n")
 
 
 @app.command()
