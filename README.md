@@ -1,5 +1,7 @@
 # dat1-cli
 
+![PyPI - Version](https://img.shields.io/pypi/v/dat1-cli)
+
 A command line interface for the [dat1](dat1.co) platform.
 
 ## Installation

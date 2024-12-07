@@ -44,7 +44,7 @@ def calculate_hashes(directory, exclude_file_names=None):
             with file_path.open('rb') as f:
                 while chunk := f.read(8192):
                     hasher.update(chunk)
-            hashes.append({"path": str(file_path.relative_to(directory)), "hash": hasher.hexdigest()})
+            hashes.append({"path": str(file_path.relative_to(directory).as_posix()), "hash": hasher.hexdigest()})
     return hashes
 
 
