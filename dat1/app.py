@@ -38,7 +38,7 @@ def calculate_hashes(directory, exclude_file_names=None):
     hashes = []
     exclude_set = set(exclude_file_names) if exclude_file_names else []
 
-    for file_path in Path(directory).iterdir():
+    for file_path in Path(directory).rglob('*'):
         if file_path.is_file() and file_path.name not in exclude_set:
             hasher = hashlib.sha512()
             with file_path.open('rb') as f:
