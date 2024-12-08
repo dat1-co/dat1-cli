@@ -7,6 +7,7 @@ import yaml
 import hashlib
 import traceback
 from yaspin import yaspin
+import globre
 # from tqdm.cli import tqdm
 from pathlib import Path
 from typing import Optional
@@ -35,7 +36,7 @@ def usr_api_key_validate(usr_api_key):
 
 def should_exclude(file_path, patterns):
     for pattern in patterns:
-        if Path(file_path).match(pattern):
+        if globre.match(pattern, Path(file_path).as_posix()):
             return True
     return False
 
@@ -107,7 +108,7 @@ def init() -> None:
         print('Config file edited')
     else:
         print('Config file created')
-        config = {"model_name": answers["model_name"], "exclude": ["**/.git/**", "**/.idea/**", "*.md", "*.jpg", ".dat1.yaml"]}
+        config = {"model_name": answers["model_name"], "exclude": ["**.git/**", "**__pycache__/**", ".idea/**", "*.md", "*.jpg", ".dat1.yaml"]}
         with open(PROJECT_CONFIG_NAME, 'w') as f:
             yaml.dump(config, f,
                       Dumper=PrettyDumper,
