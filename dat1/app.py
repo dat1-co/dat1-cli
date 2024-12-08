@@ -33,13 +33,20 @@ def usr_api_key_validate(usr_api_key):
         return False
 
 
-def calculate_hashes(directory, exclude_file_names=None):
+def should_exclude(file_path, patterns):
+    for pattern in patterns:
+        if Path(file_path).match(pattern):
+            return True
+    return False
+
+
+def calculate_hashes(directory, exclude_patterns=None):
     """ Calculate hashes of files in a given directory, excluding files specified in the exclude list."""
     hashes = []
-    exclude_set = set(exclude_file_names) if exclude_file_names else []
+    exclude_set = set(exclude_patterns) if exclude_patterns else []
 
     for file_path in Path(directory).rglob('*'):
-        if file_path.is_file() and file_path.name not in exclude_set:
+        if file_path.is_file() and not should_exclude(file_path, exclude_set):
             hasher = hashlib.sha512()
             with file_path.open('rb') as f:
                 while chunk := f.read(8192):
@@ -81,20 +88,33 @@ def init() -> None:
         inquirer.Text('model_name', message="Enter model name")
     ]
     answers = inquirer.prompt(questions)
+
+    class PrettyDumper(yaml.SafeDumper):
+        def increase_indent(self, flow=False, indentless=False):
+            return super(PrettyDumper, self).increase_indent(flow, False)
+
     if Path(PROJECT_CONFIG_NAME).is_file():
         with open(PROJECT_CONFIG_NAME, 'r') as f:
             config = yaml.safe_load(f)
         config["model_name"] = answers["model_name"]
         with open(PROJECT_CONFIG_NAME, 'w') as f:
-            yaml.dump(config, f)
+            yaml.dump(config, f,
+                      Dumper=PrettyDumper,
+                      default_flow_style=False,
+                      sort_keys=False,
+                      indent=2,
+                      width=80)
         print('Config file edited')
     else:
         print('Config file created')
-        config = {"model_name": answers["model_name"], "exclude": []}
+        config = {"model_name": answers["model_name"], "exclude": ["**/.git/**", "**/.idea/**", "*.md", "*.jpg", ".dat1.yaml"]}
         with open(PROJECT_CONFIG_NAME, 'w') as f:
-            yaml.dump(config, f)
-    print(config)
-
+            yaml.dump(config, f,
+                      Dumper=PrettyDumper,
+                      default_flow_style=False,
+                      sort_keys=False,
+                      indent=2,
+                      width=80)
 
 def read_file(file_path, part_number):
     start_byte = part_number * UPLOAD_CHUNK_SIZE
@@ -198,7 +218,7 @@ def deploy() -> None:
         "5. Calculate hashes for working version of the model"
         exclude = config.get("exclude") or []
         exclude.append(PROJECT_CONFIG_NAME)
-        files_hashes = calculate_hashes("./", exclude_file_names=exclude)
+        files_hashes = calculate_hashes("./", exclude_patterns=exclude)
         if completed_versions:
             "6. Find modified and new files"
             latest_version_set = set((x["path"], x["hash"]) for x in completed_versions[-1]["files"])

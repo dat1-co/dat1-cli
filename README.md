@@ -25,6 +25,21 @@ To initialize a new model project, run in the root directory of your project:
 dat1 init
 ```
 
+This will create a `dat1.yaml` file in the root directory of your project. This file contains the configuration for your model:
+
+```yaml
+model_name: <your model name>
+exclude:
+  - '**/.git/**'
+  - '**/.idea/**'
+  - '*.md'
+  - '*.jpg'
+  - .dat1.yaml
+```
+
+Exclude uses glob patterns to exclude files from being uploaded to the platform. 
+
+
 To upload your model to the platform:
 
 ```bash
