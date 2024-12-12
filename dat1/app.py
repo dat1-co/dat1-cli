@@ -303,7 +303,7 @@ def serve() -> None:
 
     client = docker.from_env()
 
-    image_name = "public.ecr.aws/dat1/dat1/runtime:0.2"
+    image_name = "public.ecr.aws/dat1/dat1/runtime:0.6.2"
     container = None  # Global reference for cleanup
     stop_requested = threading.Event()  # Event to signal stop
 
