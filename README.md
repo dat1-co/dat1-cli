@@ -56,6 +56,9 @@ from fastapi import Request, FastAPI
 from vllm import LLM, SamplingParams
 import os
 
+# Model initialization Code
+# This code should be placed before the FastAPI app is initialized
+
 llm = LLM(model=os.path.expanduser('./'), load_format="safetensors", enforce_eager=True)
 
 app = FastAPI()
@@ -66,11 +69,50 @@ async def root():
 
 @app.post("/infer")
 async def infer(request: Request):
+    # Inference Code
     request = await request.json()
     prompts = request["prompt"]
     sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
     outputs = llm.generate(prompts, sampling_params)
     return { "response" : outputs[0].outputs[0].text }
+```
+
+### Streaming Responses with Server-Sent Events
+
+To stream responses to the client, you can use Server-Sent Events (SSE).
+To specify that the response should be streamed, you need to add `response_type: sse` to the model definition in the `dat1.yaml` file.
+
+```yaml
+model_name: chat_completion
+response_type: sse
+exclude:
+  - '**/.git/**'
+  - '**/.idea/**'
+  - '*.md'
+  - '*.jpg'
+  - .dat1.yaml
+```
+
+The handler code should be modified to return a generator that yields the responses:
+
+```python
+from fastapi import Request, FastAPI
+from sse_starlette.sse import EventSourceResponse
+import json
+
+app = FastAPI()
+
+@app.get("/")
+async def root():
+    return "OK"
+
+async def response_generator():
+    for i in range(10):
+        yield json.dumps({"response": f"Response {i}"})    
+
+@app.post("/infer")
+async def infer(request: Request):
+    return EventSourceResponse(response_generator(), sep="\n")
 ```
 
 ## Launching Locally
