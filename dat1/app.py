@@ -23,8 +23,9 @@ UPLOAD_CHUNK_SIZE = 250_000_000
 
 root_url = "https://api.dat1.co/api/v1"
 if os.environ.get("DAT1_API_URL"):
-    print("Using API URL:", root_url)
     root_url = os.environ.get("DAT1_API_URL")
+    print("Using API URL:", root_url)
+
 
 def usr_api_key_validate(usr_api_key):
     # Make the POST request
