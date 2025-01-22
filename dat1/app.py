@@ -113,7 +113,13 @@ def init() -> None:
         print('Config file edited')
     else:
         print('Config file created')
-        config = {"model_name": answers["model_name"], "exclude": ["**.git/**", "**__pycache__/**", ".idea/**", "*.md", "*.jpg", ".dat1.yaml"]}
+        config = {"model_name": answers["model_name"], "exclude": ["**.git/**",
+                                                                   "**__pycache__/**",
+                                                                   ".idea/**",
+                                                                   "*.md",
+                                                                   "*.jpg",
+                                                                   ".dat1.yaml",
+                                                                   ".DS_Store"]}
         with open(PROJECT_CONFIG_NAME, 'w') as f:
             yaml.dump(config, f,
                       Dumper=PrettyDumper,

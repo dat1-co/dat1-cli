@@ -10,7 +10,6 @@ A command line interface for the [dat1](dat1.co) platform.
 pip install dat1-cli
 ```
 
-
 ## Usage
 
 Initialize with your API key:
@@ -28,6 +27,7 @@ dat1 init
 This will create a `dat1.yaml` file in the root directory of your project. This file contains the configuration for your model:
 
 ```yaml
+
 model_name: <your model name>
 exclude:
   - '**/.git/**'
@@ -35,10 +35,10 @@ exclude:
   - '*.md'
   - '*.jpg'
   - .dat1.yaml
+  - .DS_Store
 ```
 
-Exclude uses glob patterns to exclude files from being uploaded to the platform. 
-
+Exclude uses glob patterns to exclude files from being uploaded to the platform.
 
 To upload your model to the platform:
 
@@ -108,7 +108,7 @@ async def root():
 
 async def response_generator():
     for i in range(10):
-        yield json.dumps({"response": f"Response {i}"})    
+        yield json.dumps({"response": f"Response {i}"})  
 
 @app.post("/infer")
 async def infer(request: Request):
@@ -120,7 +120,7 @@ async def infer(request: Request):
 ### Pre-requisites
 
 - Docker
-- CUDA-compatible GPU 
+- CUDA-compatible GPU
 - NVIDIA Container Toolkit
 
 To launch your model locally, run:
