@@ -46,7 +46,7 @@ To upload your model to the platform:
 dat1 deploy
 ```
 
-A good starting point for your model is using the [example model](https://github.com/dat1-co/dat1-docker/tree/main/example).
+A good starting point for your model is using one of the [example models](https://github.com/dat1-co/dat1-model-examples).
 
 Otherwise, the platform expects a `handler.py` file in the root directory of your project that contains a FastAPI app with two endpoints: GET `/` for healthchecks and POST `/infer` for inference.
 An example handler is shown below:
