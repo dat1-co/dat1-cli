@@ -241,9 +241,12 @@ def deploy() -> None:
             files_to_keep = []
             files_to_add = files_hashes
 
+        base_image = config.get("base_image") or None
         "7. Create new version of the model with reusing files"
         url = f"{root_url}/models/{config['model_name']}/versions"
         payload = {"files": files_to_keep}
+        if base_image:
+            payload["baseImage"] = base_image
         headers = {
             "Content-Type": "application/json",
             "X-API-Key": api_key
