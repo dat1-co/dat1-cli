@@ -12,6 +12,7 @@ import globre
 # from tqdm.cli import tqdm
 from pathlib import Path
 from typing import Optional
+from concurrent.futures import ProcessPoolExecutor
 
 from dat1 import __app_name__, __version__
 
@@ -46,19 +47,39 @@ def should_exclude(file_path, patterns):
     return False
 
 
-def calculate_hashes(directory, exclude_patterns=None):
-    """ Calculate hashes of files in a given directory, excluding files specified in the exclude list."""
-    hashes = []
-    exclude_set = set(exclude_patterns) if exclude_patterns else []
+def hash_file(args):
+    """ Calculate hash of single file."""
+    file_path, base_directory = args
+    hasher = hashlib.blake2b()
+    buffer_size = 65536
+    try:
+        with file_path.open('rb') as f:
+            while chunk := f.read(buffer_size):
+                hasher.update(chunk)
+        return {
+            "path": str(Path(file_path).relative_to(base_directory).as_posix()), 
+            "hash": hasher.hexdigest()
+        }
+    except (OSError, PermissionError):
+        return None
 
+
+def calculate_hashes(directory, exclude_patterns=None, max_workers=None):
+    """ Calculate hashes of files in a given directory, excluding files specified in the exclude list."""
+    directory = Path(directory)
+    exclude_set = set(exclude_patterns) if exclude_patterns else []
+    files_to_process = []
+    
     for file_path in Path(directory).rglob('*'):
         if file_path.is_file() and not should_exclude(file_path, exclude_set):
-            hasher = hashlib.sha512()
-            with file_path.open('rb') as f:
-                while chunk := f.read(8192):
-                    hasher.update(chunk)
-            hashes.append({"path": str(file_path.relative_to(directory).as_posix()), "hash": hasher.hexdigest()})
-    return hashes
+            files_to_process.append((file_path, directory))
+    
+    results = []
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        for result in executor.map(hash_file, files_to_process):
+            if result:
+                results.append(result)
+    return results
 
 
 @app.command()
