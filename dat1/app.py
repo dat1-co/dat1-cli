@@ -57,7 +57,7 @@ def hash_file(args):
             while chunk := f.read(buffer_size):
                 hasher.update(chunk)
         return {
-            "path": str(Path(file_path).relative_to(base_directory).as_posix()), 
+            "path": str(Path(file_path).relative_to(base_directory).as_posix()),
             "hash": hasher.hexdigest()
         }
     except (OSError, PermissionError):
@@ -69,11 +69,11 @@ def calculate_hashes(directory, exclude_patterns=None, max_workers=None):
     directory = Path(directory)
     exclude_set = set(exclude_patterns) if exclude_patterns else []
     files_to_process = []
-    
+
     for file_path in Path(directory).rglob('*'):
         if file_path.is_file() and not should_exclude(file_path, exclude_set):
             files_to_process.append((file_path, directory))
-    
+
     results = []
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for result in executor.map(hash_file, files_to_process):
@@ -346,7 +346,7 @@ def serve() -> None:
 
     client = docker.from_env()
 
-    image_name = "public.ecr.aws/dat1/dat1/runtime:0.6.6"
+    image_name = "public.ecr.aws/dat1/dat1/runtime:1.0.2"
     container = None  # Global reference for cleanup
     stop_requested = threading.Event()  # Event to signal stop
 
